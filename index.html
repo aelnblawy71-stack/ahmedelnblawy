@@ -382,7 +382,7 @@
     .ring-section { position:relative; overflow:hidden; padding-block:clamp(2.75rem,6vw,4.75rem) 2.25rem; border-block-start:1px solid var(--line); background:radial-gradient(ellipse at 50% 60%,var(--ng2),transparent 62%); }
     .ring-stage { height:clamp(28rem,56vw,42rem); display:grid; place-items:center; perspective:2600px; cursor:grab; touch-action:pan-y; user-select:none; }
     .ring-stage:active { cursor:grabbing; }
-    .ring { position:relative; width:clamp(13rem,18vw,16.5rem); aspect-ratio:72/100; transform-style:preserve-3d; will-change:transform; }
+    .ring { position:relative; width:clamp(15rem,22vw,20rem); aspect-ratio:88/100; transform-style:preserve-3d; will-change:transform; }
     .ring-card { position:absolute; inset:0; overflow:hidden; border:1px solid var(--neon); border-radius:1.45rem; background:var(--surface); box-shadow:0 0 18px var(--ng),0 0 48px var(--ng2); -webkit-box-reflect:below 10px linear-gradient(transparent 66%,#ffffff20); }
     .ring-card .work-art { width:100%; height:100%; aspect-ratio:auto; }
     .ring-hint { margin-block-start:1.15rem; text-align:center; color:var(--muted); font-size:.9rem; font-weight:700; }
@@ -415,7 +415,7 @@
       .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .section-heading > * { min-width: 0; }
       .ring-stage { height: clamp(19rem, 90vw, 28rem); perspective: 1400px; }
-      .ring { width: clamp(8rem, 38vw, 13rem); }
+      .ring { width: clamp(8rem, 38vw, 13rem); aspect-ratio:72/100; }
     }
     .multi-art img { object-fit: contain; background:#0e0e10; }
     .multi-art { background:#0e0e10; }
@@ -488,7 +488,7 @@
     .motion .deck-stars i { animation:deck-twinkle var(--tl,5s) ease-in-out var(--td,0s) infinite; }
     @keyframes deck-twinkle { 0%,100% { opacity:.12; } 50% { opacity:.9; } }
 
-    .deck-stage { position:relative; z-index:1; direction:ltr; --cw:clamp(10rem, 17vw, 14rem); height:clamp(31rem, 78svh, 41rem); touch-action:manipulation; }
+    .deck-stage { position:relative; z-index:1; direction:ltr; --cw:clamp(10rem, 17vw, 14rem); height:clamp(31rem, 78svh, 41rem); touch-action:pan-y; }
     .fan-card { position:absolute; left:50%; top:50%; width:var(--cw); aspect-ratio:4 / 5; margin:calc(var(--cw) * -.625) 0 0 calc(var(--cw) * -.5);
       transform:translate(calc(var(--x,0) * 1px), calc(var(--y,0) * 1px)) rotate(calc(var(--r,0) * 1deg)) scale(var(--s,1));
       translate:0 var(--hy,0px); opacity:var(--o,1); perspective:1400px; container-type:inline-size;
@@ -498,7 +498,7 @@
     .motion .deck-stage.is-snap .fan-card, .motion .deck-stage.is-snap .fan-flip, .motion .fan-card.snap { transition:none !important; }
     .fan-card.ghost { filter:brightness(.6) saturate(.85); }
     .fan-flip { position:absolute; inset:0; transform-style:preserve-3d; }
-    .motion .fan-flip { transition:transform .9s cubic-bezier(.65,0,.15,1); }
+    .motion .fan-flip { transition:transform .48s cubic-bezier(.22,.75,.25,1); }
     .fan-card.flipped .fan-flip { transform:rotateY(180deg); }
     .face { position:absolute; inset:0; margin:0; padding:0; overflow:hidden; border:1px solid var(--neon); border-radius:9cqw; background:var(--surface);
       backface-visibility:hidden; -webkit-backface-visibility:hidden; color:inherit; text-align:start;
@@ -1156,6 +1156,7 @@ function openProject(index, slide = 0) {
 
 deckStage.addEventListener("click", event => {
   if (DECK.held) { DECK.held = false; return; }
+  if (DECK.busy) return;
   const card = event.target.closest(".fan-card");
   if (!card || event.target.closest("a")) return;
   const i = Number(card.dataset.card);
@@ -1171,21 +1172,27 @@ function stopHold() {}
 function flipToNext(dir) {
   if (DECK.drawn < 0 || DECK.busy || SITE.works.length < 2) return;
   DECK.busy = true;
-  const i = DECK.drawn, card = deckCards()[i], flip = card.querySelector(".fan-flip");
-  card.querySelector(".fan-back").inert = false;
-  card.querySelector(".fan-front").inert = true;
-  flip.style.transform = `rotateY(${dir * 180}deg)`;
+  const i = DECK.drawn, cards = deckCards(), card = cards[i], flip = card.querySelector(".fan-flip");
+  const n = (i + (dir < 0 ? 1 : -1) + cards.length) % cards.length;
+  const nc = cards[n], incoming = nc.querySelector(".fan-flip");
+  const back = card.querySelector(".fan-back"), src = nc.querySelector(".fan-front img")?.getAttribute("src");
+  const img = back.querySelector("img");
+  if (src) { if (img) img.src = src; else { const el = new Image(); el.src = src; back.append(el); } }
+  else if (img) img.remove();
+  const moving = motionEnabled();
+  // Finish at the edge, then exchange cards without snapping their positions.
+  flip.style.transform = `rotateY(${dir * 90}deg)`;
   setTimeout(() => {
-    const n = (i + 1) % SITE.works.length, cards = deckCards(), nc = cards[n];
-    card.classList.add("snap"); nc.classList.add("snap");
-    flip.style.transform = "";
+    incoming.style.transition = "none";
+    incoming.style.transform = `rotateY(${-dir * 90}deg)`;
     DECK.drawn = n; DECK.flipped = false;
-    hydrateThumbs(n);
-    deckLayout(); applyDeckState();
-    void nc.offsetWidth;
-    card.classList.remove("snap"); nc.classList.remove("snap");
-    DECK.busy = false;
-  }, motionEnabled() ? 920 : 0);
+    hydrateThumbs(n); deckLayout(); applyDeckState();
+    void incoming.offsetWidth;
+    incoming.style.transition = "";
+    incoming.style.transform = "";
+    flip.style.transform = "";
+    setTimeout(() => { DECK.busy = false; }, moving ? 950 : 0);
+  }, moving ? 230 : 0);
 }
 (function dragFlip() {
   let d = null;
@@ -1193,25 +1200,26 @@ function flipToNext(dir) {
     DECK.held = false;
     const card = event.target.closest(".fan-card.drawn");
     if (!card || DECK.busy || event.button > 0 || event.target.closest("a, [data-act]")) return;
-    d = { card, flip: card.querySelector(".fan-flip"), x: event.clientX, w: card.getBoundingClientRect().width || 1, dx: 0, moved: false };
+    d = { card, flip: card.querySelector(".fan-flip"), x: event.clientX, y: event.clientY, id: event.pointerId, w: card.getBoundingClientRect().width || 1, dx: 0, moved: false, start: performance.now() };
   });
   window.addEventListener("pointermove", event => {
-    if (!d) return;
-    const dx = event.clientX - d.x;
+    if (!d || event.pointerId !== d.id) return;
+    const dx = event.clientX - d.x, dy = event.clientY - d.y;
+    if (!d.moved && Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { d = null; return; }
     if (!d.moved && Math.abs(dx) < 6) return;
-    if (!d.moved) { d.moved = true; d.card.classList.add("dragging"); }
+    if (!d.moved) { d.moved = true; d.card.classList.add("dragging"); d.card.setPointerCapture?.(event.pointerId); }
     d.dx = dx;
-    const a = Math.min(180, Math.abs(dx) / (d.w * .9) * 180) * Math.sign(dx);
+    const a = Math.min(85, Math.abs(dx) / (d.w * .65) * 90) * Math.sign(dx);
     d.flip.style.transform = `rotateY(${a}deg)`;
   });
-  function end() {
-    if (!d) return;
+  function end(event) {
+    if (!d || event.pointerId !== d.id) return;
     const cur = d; d = null;
     cur.card.classList.remove("dragging");
     if (!cur.moved) return;
-    DECK.held = true;                       // swallow the click that follows a drag
-    const a = Math.min(180, Math.abs(cur.dx) / (cur.w * .9) * 180);
-    if (a > 35) flipToNext(Math.sign(cur.dx) || 1);
+    DECK.held = true;
+    const speed = Math.abs(cur.dx) / Math.max(1, performance.now() - cur.start);
+    if (event.type !== "pointercancel" && (Math.abs(cur.dx) > cur.w * .22 || (Math.abs(cur.dx) > 25 && speed > .45))) flipToNext(Math.sign(cur.dx) || 1);
     else cur.flip.style.transform = "";
   }
   window.addEventListener("pointerup", end);
@@ -1783,7 +1791,7 @@ function buildRing() {
 function layoutRing() {
   const n = ringEl.children.length;
   const baseRadius = (ringEl.offsetWidth / 2) / Math.tan(Math.PI / n);
-  ringR = matchMedia("(max-width: 45rem)").matches ? Math.max(130, Math.round(baseRadius * 1.15)) : Math.max(380, Math.round(baseRadius * 1.55) + 28);
+  ringR = matchMedia("(max-width: 45rem)").matches ? Math.max(130, Math.round(baseRadius * 1.15)) : Math.max(380, Math.round(baseRadius * 1.65) + 28);
   ringEl.querySelectorAll(".ring-card").forEach((card, i) => card.style.transform = `rotateY(${i * 360 / n}deg) translateZ(${ringR}px)`);
 }
 function spinRing() {

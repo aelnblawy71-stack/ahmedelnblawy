@@ -13,6 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.css">
   <style>
     :root {
       color-scheme: dark;
@@ -760,7 +761,7 @@
       <div class="wrap">
         <div class="section-heading">
           <h2 id="works-title" data-i="h2"></h2>
-          <div class="filters" id="filters" role="group" data-label="filters"></div>
+          <div class="filters" id="filters" data-lenis-prevent role="group" data-label="filters"></div>
         </div>
         <div class="deck" id="deck">
           <div class="deck-sky" aria-hidden="true"><svg class="deck-wheel" viewBox="-340 -340 680 680" focusable="false"></svg><div class="deck-stars"></div></div>
@@ -821,7 +822,7 @@
   <div class="footer-mark" id="footer-mark" aria-hidden="true"></div>
   <footer class="site-footer"><div class="wrap" id="footer"></div></footer>
 
-  <dialog class="dialog" id="project" aria-labelledby="project-title">
+  <dialog data-lenis-prevent class="dialog" id="project" aria-labelledby="project-title">
     <div class="dialog-head"><span class="category" id="project-category"></span><button type="button" class="control" id="close-project" data-label="close" autofocus>✕</button></div>
     <div class="dialog-body">
       <div id="project-art"></div>
@@ -2100,5 +2101,49 @@ parallaxUpdate();
   </script>
 <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" onload="initProfileScroll(); setupJourney()"></script>
+
+<!-- Lenis smooth scrolling: native touch, GSAP synchronization and accessible fallback. -->
+<script defer src="https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/lenis.min.js" onload="initSmoothScroll()"></script>
+<script>
+function initSmoothScroll() {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let lenis = null, rafId = 0, ticker = null;
+  const modal = document.getElementById('project');
+  function configure() {
+    if (ticker && window.gsap) gsap.ticker.remove(ticker);
+    ticker = null;
+    cancelAnimationFrame(rafId);
+    if (lenis) { lenis.destroy(); lenis = null; }
+    if (reduced.matches || typeof window.Lenis !== 'function') return;
+    lenis = new Lenis({
+      autoRaf: false,
+      lerp: 0.08,
+      smoothWheel: true,
+      wheelMultiplier: 0.9,
+      syncTouch: false,
+      anchors: true,
+      infinite: false
+    });
+    if (window.ScrollTrigger) lenis.on('scroll', () => ScrollTrigger.update());
+    if (window.gsap) {
+      ticker = time => lenis?.raf(time * 1000);
+      gsap.ticker.add(ticker);
+      gsap.ticker.lagSmoothing(0);
+    } else {
+      const frame = time => { if (lenis) { lenis.raf(time); rafId = requestAnimationFrame(frame); } };
+      rafId = requestAnimationFrame(frame);
+    }
+    if (modal?.open) lenis.stop();
+  }
+  if (modal) {
+    new MutationObserver(() => {
+      if (modal.open) lenis?.stop(); else lenis?.start();
+    }).observe(modal, { attributes: true, attributeFilter: ['open'] });
+  }
+  reduced.addEventListener('change', configure);
+  configure();
+}
+</script>
+
 </body>
 </html>
